@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏋️ 饼干 · 训练数据看板 v1</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0a0a0f;
+    color: #e4e4e7;
+    line-height: 1.55;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    padding: 24px 0 32px;
+    border-bottom: 1px solid #1f1f2a;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header .sub {
+    color: #71717a;
+    font-size: 13px;
+  }
+  .header .update {
+    color: #52525b;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* KPI 卡片 */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: linear-gradient(145deg, #15151d, #111118);
+    border: 1px solid #27272f;
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color 0.2s;
+  }
+  .kpi:hover { border-color: #f59e0b; }
+  .kpi .label {
+    font-size: 11px;
+    color: #a1a1aa;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .kpi .value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #f4f4f5;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi .unit {
+    font-size: 13px;
+    color: #71717a;
+    margin-left: 2px;
+  }
+  .kpi .delta {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  .up { color: #10b981; }
+  .down { color: #ef4444; }
+  .neutral { color: #71717a; }
+
+  /* 赛备卡片 */
+  .race-card {
+    background: linear-gradient(135deg, #7c2d12 0%, #991b1b 50%, #450a0a 100%);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #9a3412;
+  }
+  .race-card::before {
+    content: "";
+    position: absolute;
+    top: -50%; right: -10%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(245,158,11,0.25) 0%, transparent 70%);
+  }
+  .race-card .title {
+    font-size: 13px;
+    color: #fed7aa;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .race-card .name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .race-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    position: relative;
+  }
+  .race-meta .item .n {
+    font-size: 26px;
+    font-weight: 800;
+    color: #fbbf24;
+    font-variant-numeric: tabular-nums;
+  }
+  .race-meta .item .l {
+    font-size: 11px;
+    color: #fed7aa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+  .goal-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    position: relative;
+  }
+  .tag {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #f4f4f5;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    white-space: nowrap;
+  }
+  .tag.ghost { border-style: dashed; color: #a1a1aa; }
+  .tag.push { background: #f59e0b; color: #451a03; border-color: #f59e0b; font-weight: 700; }
+
+  /* 区块 */
+  .section {
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #a1a1aa;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 4px 10px;
+    border-bottom: 1px solid #1f1f2a;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #f59e0b;
+  }
+
+  /* 双栏 */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: #111118;
+    border: 1px solid #27272f;
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+  }
+  .card .sub {
+    font-size: 11px;
+    color: #71717a;
+    margin-bottom: 12px;
+  }
+  .chart-box {
+    position: relative;
+    height: 240px;
+  }
+
+  /* 数据表 */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 9px 10px;
+    text-align: left;
+    border-bottom: 1px solid #1f1f2a;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    color: #71717a;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  td .bar {
+    display: inline-block;
+    height: 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  /* 阶段时间线 */
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .phase {
+    background: #1a1a24;
+    border: 1px solid #27272f;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .phase.now {
+    background: linear-gradient(145deg, #92400e, #78350f);
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 1px #f59e0b;
+  }
+  .phase .num {
+    font-size: 10px;
+    color: #71717a;
+    letter-spacing: 1px;
+  }
+  .phase.now .num { color: #fed7aa; }
+  .phase .nm {
+    font-size: 11px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin: 4px 0;
+  }
+  .phase .feat {
+    font-size: 10px;
+    color: #a1a1aa;
+    line-height: 1.3;
+  }
+
+  /* 短板定位 */
+  .weakness-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .weakness-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    background: #111118;
+    border: 1px solid #27272f;
+    border-radius: 8px;
+  }
+  .weakness-row .rank {
+    font-size: 11px;
+    color: #71717a;
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .weakness-row .nm {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .weakness-row .score {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .score.weak { background: #991b1b; color: #fecaca; }
+  .score.mid { background: #92400e; color: #fed7aa; }
+  .score.ok { background: #065f46; color: #a7f3d0; }
+  .score.good { background: #1e3a8a; color: #bfdbfe; }
+
+  /* 恢复状态 */
+  .status-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .status-card.ok { background: linear-gradient(135deg, #064e3b, #022c22); border: 1px solid #059669; }
+  .status-card.warn { background: linear-gradient(135deg, #78350f, #451a03); border: 1px solid #d97706; }
+  .status-card.critical { background: linear-gradient(135deg, #7f1d1d, #450a0a); border: 1px solid #dc2626; }
+  .status-card .t { font-size: 13px; color: #f4f4f5; font-weight: 500; }
+  .status-card .d { font-size: 11px; color: #a1a1aa; margin-top: 4px; }
+  .status-card .b { font-size: 22px; }
+
+  footer {
+    text-align: center;
+    padding: 30px 0 10px;
+    color: #3f3f46;
+    font-size: 11px;
+  }
+
+  /* 恢复指标 */
+  .recovery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  @media (max-width: 900px) {
+    .recovery-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  .rec-card {
+    background: #111118;
+    border: 1px solid #27272f;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .rec-card .l { font-size: 10px; color: #71717a; letter-spacing: 1px; text-transform: uppercase; }
+  .rec-card .v { font-size: 18px; font-weight: 700; color: #f4f4f5; margin: 4px 0; font-variant-numeric: tabular-nums; }
+  .rec-card .r { font-size: 11px; color: #a1a1aa; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏋️ 饼干 · 训练数据看板</h1>
+  <div class="sub">180 cm · 男 · 33 岁 · 力量 + HYROX 双线备赛</div>
+  <div class="update">最后更新 2026-07-01 · v1.0</div>
+</div>
+
+<!-- KPI 顶部卡 -->
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">体重 · 今日</div>
+    <div class="value">81.6<span class="unit">kg</span></div>
+    <div class="delta up">↓ 0.2 vs 昨日 · BMI 24.7</div>
+  </div>
+  <div class="kpi">
+    <div class="label">卧推 1RM</div>
+    <div class="value">100<span class="unit">kg</span></div>
+    <div class="delta up">↑ 24 vs M1</div>
+  </div>
+  <div class="kpi">
+    <div class="label">深蹲 1RM</div>
+    <div class="value">130<span class="unit">kg</span></div>
+    <div class="delta up">↑ 29 vs M1</div>
+  </div>
+  <div class="kpi">
+    <div class="label">硬拉 1RM</div>
+    <div class="value">150<span class="unit">kg</span></div>
+    <div class="delta up">Total 380</div>
+  </div>
+  <div class="kpi">
+    <div class="label">5K PB</div>
+    <div class="value">22'<span class="unit">+</span></div>
+    <div class="delta neutral">4'25"/km</div>
+  </div>
+  <div class="kpi">
+    <div class="label">RHR · 今日</div>
+    <div class="value">43<span class="unit">bpm</span></div>
+    <div class="delta up">🏆 精英 · 基线 46</div>
+  </div>
+  <div class="kpi">
+    <div class="label">HRV · 今日</div>
+    <div class="value">91<span class="unit">ms</span></div>
+    <div class="delta up">🚀 超基线 +11</div>
+  </div>
+  <div class="kpi">
+    <div class="label">睡眠 · 昨夜</div>
+    <div class="value">6h51</div>
+    <div class="delta up">↑ vs 均值 6h16 · 距 7h 仅 9min</div>
+  </div>
+</div>
+
+<!-- 备赛主卡 -->
+<div class="race-card">
+  <div class="title">A GAME · 2026 HYROX SHANGHAI</div>
+  <div class="name">🔥 上海秋季站 · 单人男子大众组 · 倒计时 <span id="countdown">—</span> 天</div>
+  <div class="race-meta">
+    <div class="item">
+      <div class="n" id="cd-num">122</div>
+      <div class="l">DAYS LEFT</div>
+    </div>
+    <div class="item">
+      <div class="n">1:21</div>
+      <div class="l">北京实测（净 1:19）</div>
+    </div>
+    <div class="item">
+      <div class="n">8'</div>
+      <div class="l">砍分预算</div>
+    </div>
+    <div class="item">
+      <div class="n">1:15</div>
+      <div class="l">明面主攻</div>
+    </div>
+  </div>
+  <div class="goal-tags">
+    <span class="tag ghost">保底 1:18</span>
+    <span class="tag push">明面 1:15</span>
+    <span class="tag ghost">暗冲 1:13</span>
+    <span class="tag ghost">极限 1:12</span>
+  </div>
+</div>
+
+<!-- 当前阶段 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>TRAINING MODULES · 半年轨迹</div>
+  <div class="timeline">
+    <div class="phase">
+      <div class="num">M1</div>
+      <div class="nm">适应打底</div>
+      <div class="feat">基础 + 有氧</div>
+    </div>
+    <div class="phase">
+      <div class="num">M2</div>
+      <div class="nm">HYROX 仿赛</div>
+      <div class="feat">→ 北京 1:21</div>
+    </div>
+    <div class="phase">
+      <div class="num">M3</div>
+      <div class="nm">三分化增肌</div>
+      <div class="feat">容量拉升</div>
+    </div>
+    <div class="phase">
+      <div class="num">M4</div>
+      <div class="nm">基础力量</div>
+      <div class="feat">频次 5-6/w</div>
+    </div>
+    <div class="phase">
+      <div class="num">M5</div>
+      <div class="nm">力量顶峰</div>
+      <div class="feat">三大项 PR</div>
+    </div>
+    <div class="phase now">
+      <div class="num">M6 ⚡</div>
+      <div class="nm">力量储备</div>
+      <div class="feat">W2D3 进行中</div>
+    </div>
+  </div>
+</div>
+
+<!-- PR 推进 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>三大项 e1RM 演进 · 6 个月</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="chart-box"><canvas id="prChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>半年力量进步</h3>
+      <div class="sub">基于 1,622 次训练记录</div>
+      <table>
+        <thead>
+          <tr><th>动作</th><th>M1 起点</th><th>顶峰 e1RM</th><th>提升</th><th>当前单次</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>卧推</td>
+            <td>76.0</td>
+            <td>104.8</td>
+            <td><span class="up">+28.8</span></td>
+            <td>97.5×1</td>
+          </tr>
+          <tr>
+            <td>深蹲</td>
+            <td>101.3</td>
+            <td>134.2</td>
+            <td><span class="up">+32.9</span></td>
+            <td>122.5×1</td>
+          </tr>
+          <tr>
+            <td>罗马尼亚硬拉</td>
+            <td>76.0</td>
+            <td>114.0</td>
+            <td><span class="up">+38.0</span></td>
+            <td>90×8</td>
+          </tr>
+          <tr>
+            <td><b>三大项合计</b></td>
+            <td>253.3</td>
+            <td>353.0</td>
+            <td><span class="up"><b>+99.7</b></span></td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 体重曲线 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>体重趋势 · 2026 全年</div>
+  <div class="card">
+    <div class="chart-box" style="height: 260px;"><canvas id="weightChart"></canvas></div>
+  </div>
+</div>
+
+<!-- 恢复监控 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>恢复状态 · RHR / HRV / 睡眠</div>
+
+  <div class="status-card warn">
+    <div>
+      <div class="t">⚠️ 睡眠是当前恢复链路最大短板</div>
+      <div class="d">日均 6h16m · 比推荐少 1-2h · 5 月深睡曾跌至 13% 触发 HRV 暴跌</div>
+    </div>
+    <div class="b">🛌</div>
+  </div>
+
+  <div class="recovery-grid">
+    <div class="rec-card">
+      <div class="l">RHR 基线</div>
+      <div class="v">46 bpm</div>
+      <div class="r">🏆 精英（目标 ≤44）</div>
+    </div>
+    <div class="rec-card">
+      <div class="l">HRV 基线</div>
+      <div class="v">80 ms</div>
+      <div class="r">🏆 精英（目标 ≥80）</div>
+    </div>
+    <div class="rec-card">
+      <div class="l">酒精敏感</div>
+      <div class="v">HRV -68%</div>
+      <div class="r">⚠ 极高敏 · 备赛严控</div>
+    </div>
+    <div class="rec-card">
+      <div class="l">赛前 Taper 目标</div>
+      <div class="v">10 月</div>
+      <div class="r">HRV ≥82 · RHR ≤44 · 睡 ≥7h</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chart-box" style="height: 220px;"><canvas id="recoveryChart"></canvas></div>
+  </div>
+</div>
+
+<!-- HYROX 短板定位 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>HYROX 北京分项复盘 · 短板定位</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>八大站点排名</h3>
+      <div class="sub">排名越低越好 · 同组对比</div>
+      <div class="chart-box" style="height: 260px;"><canvas id="hyroxBar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>短板优先级</h3>
+      <div class="sub">上海赛 8 min 砍分关键</div>
+      <div class="weakness-list" style="margin-top: 10px;">
+        <div class="weakness-row">
+          <div class="rank">#1 短板</div>
+          <div class="nm">跑步抗疲劳<br><span style="color:#71717a;font-size:11px">排名 242 / Best 447 · 掉速 18s/km</span></div>
+          <div class="score weak">-3~4'</div>
+        </div>
+        <div class="weakness-row">
+          <div class="rank">#2 短板</div>
+          <div class="nm">SkiErg<br><span style="color:#71717a;font-size:11px">排名 591 · 头号杠杆</span></div>
+          <div class="score weak">-4~5'</div>
+        </div>
+        <div class="weakness-row">
+          <div class="rank">#3 短板</div>
+          <div class="nm">Burpee Broad Jump<br><span style="color:#71717a;font-size:11px">排名 352 · 可技术优化</span></div>
+          <div class="score mid">-30s</div>
+        </div>
+        <div class="weakness-row">
+          <div class="rank">✅ 强项</div>
+          <div class="nm">Roxzone / Sled / Wall Ball<br><span style="color:#71717a;font-size:11px">排名 103-151 · 保持即可</span></div>
+          <div class="score good">精英级</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 本周状态 -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>当前周状态 · M6 W2D3</div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>日</th><th>类型</th><th>主项</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>D1</td><td>力量</td><td>深蹲 120/115/110 + 卧推 95/87.5/80</td><td><span class="up">✅ 完成</span></td></tr>
+        <tr><td>D2</td><td>Z2 有氧</td><td>跑步 40' + 25 组</td><td><span class="up">✅ 完成</span></td></tr>
+        <tr><td>D3</td><td>力量</td><td>臂屈伸 + 推胸 + 高位下拉 + T 杆划船 + 弯举 + 飞鸟</td><td><span style="color:#f59e0b">⚡ 今日</span></td></tr>
+        <tr><td>D4</td><td>Z2 有氧</td><td>划船 40'（建议休息）</td><td>📋 明日</td></tr>
+        <tr><td>D5</td><td>力量</td><td>深蹲 122.5 + 卧推 97.5 + RDL 90×8×4</td><td>📋 峰值日</td></tr>
+        <tr><td>D6</td><td>阈值</td><td>800m 间歇 ×5（目标 &lt; 3:25）</td><td>📋</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  🏋️ 饼干训练数据看板 · 直男教练风 · v1.0<br>
+  数据范围 2026-01-14 ~ 2026-07-01
+</footer>
+
+<script>
+  // 倒计时
+  const raceDay = new Date("2026-10-31T00:00:00+08:00");
+  const now = new Date();
+  const diff = Math.ceil((raceDay - now) / (1000 * 60 * 60 * 24));
+  document.getElementById("countdown").textContent = diff;
+  document.getElementById("cd-num").textContent = diff;
+
+  Chart.defaults.color = "#a1a1aa";
+  Chart.defaults.borderColor = "#27272f";
+  Chart.defaults.font.family = '-apple-system, "PingFang SC", sans-serif';
+
+  // e1RM 演进
+  // 数据：按月（1-6月）三大项 e1RM 高点
+  const monthLabels = ["M1·1月", "M2·2月", "M3·3月", "M4·4月", "M5·5月", "M6·6月"];
+  new Chart(document.getElementById("prChart"), {
+    type: "line",
+    data: {
+      labels: monthLabels,
+      datasets: [
+        {
+          label: "卧推 e1RM",
+          data: [85, 95, 99, 96, 105, 101],
+          borderColor: "#f59e0b",
+          backgroundColor: "rgba(245,158,11,0.1)",
+          tension: 0.3,
+          pointRadius: 4,
+          fill: false
+        },
+        {
+          label: "深蹲 e1RM",
+          data: [101, 120, 127, 128, 134, 128],
+          borderColor: "#ef4444",
+          backgroundColor: "rgba(239,68,68,0.1)",
+          tension: 0.3,
+          pointRadius: 4,
+          fill: false
+        },
+        {
+          label: "RDL e1RM",
+          data: [null, null, 107, null, null, 114],
+          borderColor: "#10b981",
+          backgroundColor: "rgba(16,185,129,0.1)",
+          tension: 0.3,
+          pointRadius: 4,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "top", labels: { padding: 10, font: { size: 11 } } },
+        title: {
+          display: true,
+          text: "三大项 e1RM 月峰值演进 (kg)",
+          color: "#e4e4e7",
+          font: { size: 13 }
+        }
+      },
+      scales: {
+        y: {
+          min: 70,
+          max: 140,
+          grid: { color: "#1f1f2a" }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // 体重曲线
+  const weightRaw = [
+    ["01-15", 81.5], ["01-18", 80.5], ["01-19", 82.5], ["01-20", 82.1],
+    ["01-23", 80.5], ["01-25", 81.0], ["01-27", 81.5], ["01-31", 81.2],
+    ["02-02", 80.5], ["02-04", 81.2], ["02-09", 81.8], ["02-14", 81.0],
+    ["02-18", 79.5], ["02-22", 81.4], ["02-25", 80.0], ["02-28", 80.8],
+    ["03-02", 80.2], ["03-04", 80.2], ["03-10", 79.0], ["03-16", 79.8],
+    ["03-23", 80.1], ["03-25", 79.9], ["03-30", 80.6], ["03-31", 81.2],
+    ["04-07", 80.0], ["04-14", 79.3], ["04-20", 79.6],
+    ["05-06", 79.5], ["05-10", 79.6], ["05-13", 81.2], ["05-29", 80.7],
+    ["06-30", 81.8]
+  ];
+  new Chart(document.getElementById("weightChart"), {
+    type: "line",
+    data: {
+      labels: weightRaw.map(d => d[0]),
+      datasets: [{
+        label: "体重 (kg)",
+        data: weightRaw.map(d => d[1]),
+        borderColor: "#06b6d4",
+        backgroundColor: "rgba(6,182,212,0.08)",
+        tension: 0.35,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        borderWidth: 2,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y} kg`
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 78, max: 83,
+          grid: { color: "#1f1f2a" },
+          ticks: { callback: v => v + " kg" }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+        }
+      }
+    }
+  });
+
+  // 恢复 月度
+  const recMonths = ["3月", "4月", "5月", "6月"];
+  new Chart(document.getElementById("recoveryChart"), {
+    type: "bar",
+    data: {
+      labels: recMonths,
+      datasets: [
+        {
+          label: "RHR 基线 (bpm)",
+          data: [44, 46, 48, 46],
+          backgroundColor: "#10b981",
+          yAxisID: "y"
+        },
+        {
+          label: "HRV 基线 (ms)",
+          data: [82, 79, 76, 80],
+          backgroundColor: "#8b5cf6",
+          yAxisID: "y"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "top", labels: { font: { size: 11 } } },
+        title: {
+          display: true,
+          text: "月度 RHR / HRV 基线走势",
+          color: "#e4e4e7",
+          font: { size: 13 }
+        }
+      },
+      scales: {
+        y: {
+          min: 30, max: 100,
+          grid: { color: "#1f1f2a" }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // HYROX 分项柱状
+  const hyrox = [
+    { name: "Roxzone", rank: 103, good: true },
+    { name: "Sled Push", rank: 151, good: true },
+    { name: "Sled Pull", rank: 169, good: true },
+    { name: "Lunges", rank: 150, good: true },
+    { name: "Wall Ball", rank: 151, good: true },
+    { name: "Row 1K", rank: 194, good: true },
+    { name: "BBJ", rank: 352, good: false },
+    { name: "SkiErg", rank: 591, good: false }
+  ];
+  new Chart(document.getElementById("hyroxBar"), {
+    type: "bar",
+    data: {
+      labels: hyrox.map(h => h.name),
+      datasets: [{
+        label: "同组排名（越小越好）",
+        data: hyrox.map(h => h.rank),
+        backgroundColor: hyrox.map(h => h.good ? "rgba(16,185,129,0.8)" : "rgba(239,68,68,0.85)"),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          reverse: true,
+          grid: { color: "#1f1f2a" },
+          title: { display: true, text: "排名（← 越靠前越好）", color: "#71717a", font: { size: 10 } }
+        },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
